@@ -5,15 +5,14 @@ import "encoding/json"
 type Action uint32
 
 const (
-	ERROR    Action = 0
-	ADD      Action = 1
-	SUB      Action = 2
-	RESPONSE Action = 3
+	ERROR   Action = 0
+	REFUSE  Action = 1
+	ALLOW   Action = 2
+	REQUEST Action = 3
 )
 
 type Message struct {
-	Action  Action
-	Payload []int64
+	Action Action
 }
 
 func (m *Message) Pack() ([]byte, error) {
