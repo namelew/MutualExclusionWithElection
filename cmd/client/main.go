@@ -23,11 +23,12 @@ func main() {
 	godotenv.Load()
 
 	for {
-		if client.Request() {
+		if client.Lock() {
 			log.Printf("Client %d enter the critical region\n", *id)
 			time.Sleep(USETIME)
+			client.Unlock()
 		} else {
-			waitTime := rand.Int()
+			waitTime := rand.Intn(10)
 			log.Printf("Client %d can't enter the critical region and will sleep %d seconds\n", *id, waitTime)
 			time.Sleep(time.Second * time.Duration(waitTime))
 		}

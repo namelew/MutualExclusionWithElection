@@ -9,6 +9,8 @@ const (
 	REFUSE  Action = 1
 	ALLOW   Action = 2
 	REQUEST Action = 3
+	FREE    Action = 5
+	ACKFREE Action = 6
 )
 
 type Message struct {

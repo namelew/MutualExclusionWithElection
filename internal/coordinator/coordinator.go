@@ -57,12 +57,19 @@ func Handler() {
 				defer crMutex.Unlock()
 
 				if !criticalRegion {
+					criticalRegion = true
 					log.Println(c.RemoteAddr().String(), "allowed to access critical region")
 					out.Action = messages.ALLOW
 				} else {
 					log.Println(c.RemoteAddr().String(), "not allowed to access critical region")
 					out.Action = messages.REFUSE
 				}
+			case messages.FREE:
+				crMutex.Lock()
+				criticalRegion = false
+				out.Action = messages.ACKFREE
+				log.Println("Critical region free to use")
+				defer crMutex.Unlock()
 			}
 
 			Send(c, &out)

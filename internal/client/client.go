@@ -11,7 +11,7 @@ import (
 
 const protocol = "tcp"
 
-func Request() bool {
+func Lock() bool {
 	c, err := net.Dial(protocol, os.Getenv("CTRADRESS"))
 	buffer := make([]byte, 256)
 
@@ -47,4 +47,28 @@ func Request() bool {
 	response.Unpack(buffer[:n])
 
 	return response.Action == messages.ALLOW
+}
+
+func Unlock() {
+	c, err := net.Dial(protocol, os.Getenv("CTRADRESS"))
+
+	if err != nil {
+		log.Println("Unable to create connection with Coordenator. ", err.Error())
+		return
+	}
+
+	request := messages.Message{
+		Action: messages.FREE,
+	}
+
+	requestPayload, err := request.Pack()
+
+	if err != nil {
+		log.Println("Unable to create unlock message. ", err.Error())
+		return
+	}
+
+	c.Write(requestPayload)
+
+	time.After(time.Second * 5)
 }
