@@ -12,6 +12,10 @@ import (
 
 const USETIME = time.Second * 2
 
+// TODO:
+//	- Critical region ins't be granted
+//  - Don't now if is client ou coordinator
+
 func main() {
 	var (
 		id = flag.Int("id", rand.Int(), "client id")
