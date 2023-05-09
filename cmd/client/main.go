@@ -13,8 +13,7 @@ import (
 const USETIME = time.Second * 2
 
 // TODO:
-//	- Critical region ins't be granted
-//  - Don't now if is client ou coordinator
+//	- Implementing control queue to requests
 
 func main() {
 	var (
