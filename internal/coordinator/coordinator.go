@@ -9,14 +9,26 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/namelew/RPC/packages/messages"
+	"github.com/namelew/RPC/packages/queue"
 )
 
 const protocol = "tcp"
 
-var crMutex = sync.Mutex{}
-var criticalRegion = false
+type Coordinator struct {
+	request        *queue.Queue[string]
+	mutex          *sync.Mutex
+	criticalRegion bool
+}
 
-func Handler() {
+func Build() *Coordinator {
+	return &Coordinator{
+		request:        &queue.Queue[string]{},
+		mutex:          &sync.Mutex{},
+		criticalRegion: false,
+	}
+}
+
+func (cd *Coordinator) Handler() {
 	godotenv.Load(".env")
 
 	l, err := net.Listen(protocol, os.Getenv("CTRADRESS"))
@@ -53,11 +65,11 @@ func Handler() {
 
 			switch in.Action {
 			case messages.REQUEST:
-				crMutex.Lock()
-				defer crMutex.Unlock()
+				cd.mutex.Lock()
+				defer cd.mutex.Unlock()
 
-				if !criticalRegion {
-					criticalRegion = true
+				if !cd.criticalRegion {
+					cd.criticalRegion = true
 					log.Println(c.RemoteAddr().String(), "allowed to access critical region")
 					out.Action = messages.ALLOW
 				} else {
@@ -65,11 +77,11 @@ func Handler() {
 					out.Action = messages.REFUSE
 				}
 			case messages.FREE:
-				crMutex.Lock()
-				criticalRegion = false
+				cd.mutex.Lock()
+				defer cd.mutex.Unlock()
+				cd.criticalRegion = false
 				out.Action = messages.ACKFREE
 				log.Println("Critical region free to use")
-				defer crMutex.Unlock()
 			}
 
 			Send(c, &out)

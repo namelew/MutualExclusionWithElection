@@ -3,5 +3,6 @@ package main
 import "github.com/namelew/RPC/internal/coordinator"
 
 func main() {
-	coordinator.Handler()
+	cd := coordinator.Build()
+	cd.Handler()
 }
