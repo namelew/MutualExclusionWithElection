@@ -14,7 +14,8 @@ const (
 )
 
 type Message struct {
-	Action Action
+	Action   Action
+	Lockback string
 }
 
 func (m *Message) Pack() ([]byte, error) {
