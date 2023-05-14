@@ -1,53 +1,40 @@
 package queue
 
 import (
-	"errors"
 	"sync"
-
-	"github.com/namelew/RPC/packages/messages"
 )
 
-type node struct {
-	destiny uint64
-	data    messages.Message
+type Queue[T any] struct {
+	slice []T
+	lock  *sync.Mutex
+	cond  *sync.Cond
 }
 
-type Queue struct {
-	elements []node
-	mutex    *sync.Mutex
-}
-
-func (q *Queue) Check(id uint64) bool {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-	return q.elements[0].destiny == id
-}
-
-func (q *Queue) Dequeue() (messages.Message, error) {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
-
-	n := len(q.elements)
-
-	if n < 1 {
-		return messages.Message{}, errors.New("empty queue")
+func New[T any]() *Queue[T] {
+	q := Queue[T]{
+		slice: make([]T, 0),
+		lock:  &sync.Mutex{},
 	}
 
-	data := q.elements[0].data
+	q.cond = sync.NewCond(q.lock)
 
-	if n > 1 {
-		q.elements = q.elements[1:]
-	} else {
-		q.elements = []node{}
-	}
-
-	return data, nil
+	return &q
 }
 
-func (q *Queue) Enqueue(id uint64, data messages.Message) {
-	q.mutex.Lock()
+func (q *Queue[T]) Enqueue(i T) {
+	q.lock.Lock()
+	q.slice = append(q.slice, i)
+	q.lock.Unlock()
+	q.cond.Signal()
+}
 
-	q.elements = append(q.elements, node{id, data})
-
-	q.mutex.Unlock()
+func (q *Queue[T]) Dequeue() T {
+	for len(q.slice) == 0 {
+		q.cond.Wait()
+	}
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	result := q.slice[0]
+	q.slice = q.slice[1:len(q.slice)]
+	return result
 }
