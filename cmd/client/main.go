@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"math/rand"
 	"time"
 
@@ -17,19 +16,11 @@ const USETIME = time.Second * 2
 
 func main() {
 	var (
-		id = flag.Int("id", rand.Int(), "client id")
+		id     = flag.Int("id", rand.Int(), "client id")
+		adress = flag.String("adress", "localhost:30002", "client lockback adress")
 	)
 	godotenv.Load()
 
-	for {
-		if client.Lock() {
-			log.Printf("Client %d enter the critical region\n", *id)
-			time.Sleep(USETIME)
-			client.Unlock()
-		} else {
-			waitTime := rand.Intn(10)
-			log.Printf("Client %d can't enter the critical region and will sleep %d seconds\n", *id, waitTime)
-			time.Sleep(time.Second * time.Duration(waitTime))
-		}
-	}
+	c := client.New(*id, *adress, USETIME)
+	c.Run()
 }
