@@ -50,6 +50,7 @@ func (c *Client) Lock() bool {
 	}
 
 	request := messages.Message{
+		Id:       uint64(c.id),
 		Action:   messages.REQUEST,
 		Lockback: c.adress,
 	}
@@ -88,6 +89,7 @@ func (c *Client) Unlock() {
 	}
 
 	request := messages.Message{
+		Id:       uint64(c.id),
 		Action:   messages.FREE,
 		Lockback: c.adress,
 	}

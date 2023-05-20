@@ -14,6 +14,7 @@ const (
 )
 
 type Message struct {
+	Id       uint64
 	Action   Action
 	Lockback string
 }
