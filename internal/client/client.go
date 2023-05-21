@@ -27,12 +27,61 @@ func New(id int, adress string, useDelay time.Duration) *Client {
 }
 
 func (c *Client) Run() {
+	enterRegion := func() {
+		log.Printf("Client %d enter the critical region\n", c.id)
+		time.Sleep(c.usetime)
+		c.Unlock()
+	}
 	for {
-		if c.Lock() {
-			log.Printf("Client %d enter the critical region\n", c.id)
-			time.Sleep(c.usetime)
-			c.Unlock()
-		} else {
+		switch c.Lock() {
+		case messages.ALLOW:
+			enterRegion()
+		case messages.REFUSE:
+			waitTime := rand.Intn(10)
+			l, err := net.Listen("tcp", c.adress)
+
+			if err != nil {
+				log.Println("Error to open listener. ", err.Error())
+				time.Sleep(time.Second * time.Duration(waitTime))
+				continue
+			}
+
+			for {
+				c, err := l.Accept()
+
+				if err != nil {
+					log.Println("Error to accept connection. ", err.Error())
+					time.Sleep(time.Second * time.Duration(waitTime))
+					continue
+				}
+
+				buffer := make([]byte, 1024)
+				var m messages.Message
+				n, err := c.Read(buffer)
+
+				if err != nil {
+					log.Println("Error to read from connection. ", err.Error())
+					c.Close()
+					time.Sleep(time.Second * time.Duration(waitTime))
+					continue
+				}
+
+				c.Close()
+
+				if err := m.Unpack(buffer[:n]); err != nil {
+					log.Println("Unable to unpack data from buffer. ", err.Error())
+					time.Sleep(time.Second * time.Duration(waitTime))
+					continue
+				}
+
+				if m.Action == messages.ALLOW {
+					enterRegion()
+					break
+				}
+			}
+
+			l.Close()
+		default:
 			waitTime := rand.Intn(10)
 			log.Printf("Client %d can't enter the critical region and will sleep %d seconds\n", c.id, waitTime)
 			time.Sleep(time.Second * time.Duration(waitTime))
@@ -40,13 +89,13 @@ func (c *Client) Run() {
 	}
 }
 
-func (c *Client) Lock() bool {
+func (c *Client) Lock() messages.Action {
 	conn, err := net.Dial(protocol, os.Getenv("CTRADRESS"))
 	buffer := make([]byte, 256)
 
 	if err != nil {
 		log.Println("Unable to create connection with Coordenator. ", err.Error())
-		return false
+		return messages.ERROR
 	}
 
 	request := messages.Message{
@@ -59,7 +108,7 @@ func (c *Client) Lock() bool {
 
 	if err != nil {
 		log.Println("Unable to create request message. ", err.Error())
-		return false
+		return messages.ERROR
 	}
 
 	conn.Write(requestPayload)
@@ -70,14 +119,14 @@ func (c *Client) Lock() bool {
 
 	if err != nil {
 		log.Println("Unable to read data from coordinator. ", err.Error())
-		return false
+		return messages.ERROR
 	}
 
 	response := messages.Message{}
 
 	response.Unpack(buffer[:n])
 
-	return response.Action == messages.ALLOW
+	return response.Action
 }
 
 func (c *Client) Unlock() {

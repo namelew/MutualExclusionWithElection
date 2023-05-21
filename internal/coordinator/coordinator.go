@@ -15,16 +15,51 @@ import (
 const protocol = "tcp"
 
 type Coordinator struct {
-	request        *queue.Queue[string]
+	request        *queue.Queue[messages.Message]
 	mutex          *sync.Mutex
+	freeRegion     chan interface{}
 	criticalRegion bool
 }
 
 func Build() *Coordinator {
 	return &Coordinator{
-		request:        &queue.Queue[string]{},
+		request:        &queue.Queue[messages.Message]{},
 		mutex:          &sync.Mutex{},
+		freeRegion:     make(chan interface{}, 1),
 		criticalRegion: false,
+	}
+}
+
+func (cd *Coordinator) queueHandler() {
+	for {
+		<-cd.freeRegion
+		cd.mutex.Lock()
+
+		if cd.criticalRegion || cd.request.Empty() {
+			cd.mutex.Unlock()
+			continue
+		}
+
+		m := cd.request.Dequeue()
+
+		go func(m *messages.Message) {
+			conn, err := net.Dial(protocol, m.Lockback)
+
+			if err != nil {
+				log.Println("Unable to create connection with client ", m.Id, ". ", err.Error())
+				return
+			}
+
+			log.Println("Allowing acess to ", m.Id)
+
+			Send(conn, &messages.Message{
+				Id:       0,
+				Action:   messages.ALLOW,
+				Lockback: os.Getenv("CTRADRESS"),
+			})
+		}(&m)
+
+		cd.mutex.Unlock()
 	}
 }
 
@@ -36,6 +71,8 @@ func (cd *Coordinator) Handler() {
 	if err != nil {
 		log.Panic("Unable to create lisntener. ", err.Error())
 	}
+
+	go cd.queueHandler()
 
 	for {
 		request, err := l.Accept()
@@ -70,10 +107,11 @@ func (cd *Coordinator) Handler() {
 
 				if !cd.criticalRegion {
 					cd.criticalRegion = true
-					log.Println(c.RemoteAddr().String(), "allowed to access critical region")
+					log.Println(in.Id, "allowed to access critical region")
 					out.Action = messages.ALLOW
 				} else {
-					log.Println(c.RemoteAddr().String(), "not allowed to access critical region")
+					log.Println(in.Id, "not allowed to access critical region")
+					cd.request.Enqueue(in)
 					out.Action = messages.REFUSE
 				}
 			case messages.FREE:
@@ -81,7 +119,8 @@ func (cd *Coordinator) Handler() {
 				defer cd.mutex.Unlock()
 				cd.criticalRegion = false
 				out.Action = messages.ACKFREE
-				log.Println("Critical region free to use")
+				log.Println(in.Id, "finished to use Critical region")
+				cd.freeRegion <- true
 			}
 
 			Send(c, &out)

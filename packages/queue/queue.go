@@ -6,17 +6,16 @@ import (
 
 type Queue[T any] struct {
 	slice []T
-	lock  *sync.Mutex
-	cond  *sync.Cond
+	lock  sync.Mutex
+	cond  sync.Cond
 }
 
 func New[T any]() *Queue[T] {
 	q := Queue[T]{
 		slice: make([]T, 0),
-		lock:  &sync.Mutex{},
 	}
 
-	q.cond = sync.NewCond(q.lock)
+	q.cond = *sync.NewCond(&q.lock)
 
 	return &q
 }
@@ -29,7 +28,7 @@ func (q *Queue[T]) Enqueue(i T) {
 }
 
 func (q *Queue[T]) Dequeue() T {
-	for len(q.slice) == 0 {
+	for q.Empty() {
 		q.cond.Wait()
 	}
 	q.lock.Lock()
@@ -37,4 +36,8 @@ func (q *Queue[T]) Dequeue() T {
 	result := q.slice[0]
 	q.slice = q.slice[1:len(q.slice)]
 	return result
+}
+
+func (q *Queue[T]) Empty() bool {
+	return len(q.slice) == 0
 }
